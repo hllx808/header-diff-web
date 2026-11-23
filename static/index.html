@@ -1,0 +1,2275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Header Diff</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f6f9;
+    --panel: #ffffff;
+    --panel-alt: #fafbfc;
+    --row-alt: #f6f8fa;
+    --text: #1d2330;
+    --muted: #5d6472;
+    --border: #d5d9e0;
+    --accent: #2f6fed;
+    --accent-soft: #e8efff;
+    --error: #b3261e;
+    --error-bg: #fdecea;
+    --diff-changed: #a15c00;
+    --diff-changed-bg: #fdf3e3;
+    --diff-only: #6b4ed2;
+    --diff-only-bg: #f3efff;
+    --diff-hatch: #e2d9ff;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b;
+      --panel: #191d25;
+      --panel-alt: #1e232c;
+      --row-alt: #1c212a;
+      --text: #e7eaf0;
+      --muted: #9aa2b1;
+      --border: #2c323d;
+      --accent: #7aa2ff;
+      --accent-soft: #1f2b45;
+      --error: #ff8a80;
+      --error-bg: #3a1c1a;
+      --diff-changed: #e2a33c;
+      --diff-changed-bg: #332812;
+      --diff-only: #b9a8ff;
+      --diff-only-bg: #211d33;
+      --diff-hatch: #3a3358;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex: 0 0 auto;
+  }
+  .brand h1 { margin: 0; font-size: 0.95rem; letter-spacing: 0.01em; }
+  .brand p { margin: 0; color: var(--muted); font-size: 0.76rem; }
+  .top-actions { display: flex; gap: 8px; }
+
+  .btn {
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+  .btn.tiny { padding: 3px 9px; font-size: 0.73rem; font-weight: 500; }
+  .btn:disabled { opacity: 0.42; cursor: default; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .settings {
+    position: fixed;
+    top: 54px;
+    right: 14px;
+    z-index: 30;
+    width: 286px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 14px 34px rgba(16, 24, 40, 0.2);
+  }
+  .settings[hidden] { display: none; }
+  .settings h2 {
+    margin: 0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .setting { display: flex; align-items: center; gap: 8px; font-size: 0.83rem; cursor: pointer; }
+  .setting input { accent-color: var(--accent); margin: 0; }
+  .settings .note { margin: 0; color: var(--muted); font-size: 0.73rem; line-height: 1.45; }
+  .settings hr { border: 0; border-top: 1px solid var(--border); width: 100%; margin: 2px 0; }
+  .danger { background: transparent; color: var(--error); border-color: var(--error); }
+  .data-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .settings .note.error-text { color: var(--error); }
+
+  .shortcuts {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 40;
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    overflow: auto;
+    padding: 14px 18px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 18px 44px rgba(16, 24, 40, 0.28);
+  }
+  .shortcuts[hidden] { display: none; }
+  .shortcuts h2 {
+    margin: 0 0 10px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .shortcuts dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 5px 16px;
+    margin: 0;
+    font-size: 0.82rem;
+  }
+  .shortcuts dl > div { display: contents; }
+  .shortcuts dt {
+    font: 11.5px/1.6 var(--mono);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .shortcuts dd { margin: 0; }
+  .shortcuts .note { margin: 12px 0 0; color: var(--muted); font-size: 0.72rem; }
+
+  .diff {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    background: var(--panel);
+  }
+  .split { background: var(--border); grid-column: 2; grid-row: 1 / -1; }
+  /* Four bands: menus, the scrolling panes, the shared notes band, footers. */
+  .diff { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+
+  /* The halves are layout-transparent so their parts join the outer grid, which
+     is what lets one notes band span both of them while the footers stay the
+     bottom row. */
+  .half { display: contents; }
+  .half[data-side="left"] > .half-head,
+  .half[data-side="left"] > .pane-wrap,
+  .half[data-side="left"] > .half-foot { grid-column: 1; }
+  .half[data-side="right"] > .half-head,
+  .half[data-side="right"] > .pane-wrap,
+  .half[data-side="right"] > .half-foot { grid-column: 3; }
+  .half-head { grid-row: 1; }
+  .pane-wrap { grid-row: 2; }
+  .half-foot { grid-row: 4; }
+
+  .half-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 5px 8px;
+    background: var(--panel-alt);
+    border-bottom: 1px solid var(--border);
+    min-width: 0;
+  }
+  .half.active .half-head { box-shadow: inset 0 2px 0 var(--accent); }
+  .menu {
+    display: flex;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding: 1px 0;
+  }
+  .menu-empty { color: var(--muted); font-size: 0.78rem; }
+  .menu-sep { align-self: center; color: var(--border); font-size: 0.75rem; user-select: none; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 3px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 0.77rem;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .chip:hover { color: var(--accent); }
+  .chip.active {
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  .chip-num { opacity: 0.62; font-variant-numeric: tabular-nums; }
+  .chip.taken { opacity: 0.4; cursor: not-allowed; }
+  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chip-x {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    padding: 0 3px;
+    cursor: pointer;
+    opacity: 0.5;
+  }
+  .chip-x:hover { opacity: 1; color: var(--error); }
+  /* Renaming happens in the chip's own label, so the menu bar never swaps a
+     field in and out of the flow. `.chip` turns text selection off, which would
+     also take the caret away, so selection is turned back on here. */
+  .chip-label-edit {
+    min-width: 2.5em;
+    outline: 1px solid var(--accent);
+    outline-offset: 1px;
+    border-radius: 3px;
+    background: var(--panel);
+    cursor: text;
+    user-select: text;
+    -webkit-user-select: text;
+    white-space: pre;
+  }
+
+  .pane-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
+  .pane { position: absolute; inset: 0; overflow: auto; background: var(--panel); }
+  .pane:focus { outline: none; }
+  .pane:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  /* Tab switches halves rather than moving through the tab order, so the focus
+     it hands over must not draw the keyboard ring around the whole pane. The
+     accent line on the menu bar already marks the active half. */
+  .pane.tab-focus:focus-visible { outline: none; }
+
+  .rows { display: flex; flex-direction: column; min-height: 100%; }
+
+  /* Three background layers: the hover/pin overlay, the difference tint, then
+     the zebra stripe. The stripe is a token so a tint covers it without
+     erasing it, and `--overlay` is inherited so the opaque gutter can show the
+     same state. */
+  .row {
+    display: flex;
+    align-items: stretch;
+    min-width: 100%;
+    background:
+      linear-gradient(var(--overlay, transparent), var(--overlay, transparent)),
+      linear-gradient(var(--tint, transparent), var(--tint, transparent)),
+      var(--stripe, var(--panel));
+  }
+  .row:nth-child(even) { --stripe: var(--row-alt); }
+
+  .gutter {
+    flex: 0 0 auto;
+    min-width: 2.4em;
+    padding: 2px 7px 2px 6px;
+    text-align: right;
+    color: var(--muted);
+    background:
+      linear-gradient(var(--overlay, transparent), var(--overlay, transparent)),
+      linear-gradient(var(--tint, transparent), var(--tint, transparent)),
+      var(--panel);
+    border-right: 1px solid var(--border);
+    font: 11px/22px var(--mono);
+    font-variant-numeric: tabular-nums;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    user-select: none;
+  }
+  .row:nth-child(even) .gutter {
+    background:
+      linear-gradient(var(--overlay, transparent), var(--overlay, transparent)),
+      linear-gradient(var(--tint, transparent), var(--tint, transparent)),
+      var(--row-alt);
+  }
+
+  .cell {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 2px 10px;
+    font: 12.5px/22px var(--mono);
+    tab-size: 2;
+  }
+
+  /* A name that differs only in case is the same field, so it is underlined
+     rather than coloured. */
+  .name-case {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  /* The one part of a changed value that actually differs. */
+  .chg {
+    background: color-mix(in srgb, var(--diff-changed) 26%, transparent);
+    border-radius: 2px;
+  }
+
+  /* A blank cell still needs a line box of its own: with the gutter hidden it
+     would otherwise collapse to its padding, so a row only one side has would
+     be shorter than its counterpart and the two halves would drift. */
+  .cell.blank::before { content: "\00a0"; }
+
+  body.wrap .cell { white-space: pre-wrap; overflow-wrap: anywhere; }
+  body:not(.wrap) .cell { white-space: pre; }
+  body:not(.wrap) .row { width: max-content; }
+  body:not(.wrap) .cell { flex: 0 0 auto; }
+  body:not(.wrap) .cell.blank { flex: 1 1 auto; }
+  body:not(.gutters) .gutter { display: none; }
+
+  /* Difference colouring: two colours only. Amber is a value that differs,
+     violet is a header only one side has; identical rows stay plain. */
+  body.highlight .row.changed { --tint: var(--diff-changed-bg); }
+  body.highlight .row.only { --tint: var(--diff-only-bg); }
+
+  /* The bar restates the colour in a form a subtle tint cannot carry. */
+  body.highlight .row.changed .cell { box-shadow: inset 3px 0 0 var(--diff-changed); }
+  body.highlight .row.only .cell { box-shadow: inset 3px 0 0 var(--diff-only); }
+
+  /* The side that has no such header: hatched, so it reads as absent here
+     rather than as an empty value. */
+  body.highlight .row.only .cell.blank {
+    box-shadow: none;
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--diff-hatch) 0 5px,
+      transparent 5px 11px
+    );
+  }
+
+  body.highlight .row.changed .gutter { color: var(--diff-changed); }
+  body.highlight .row.only .gutter { color: var(--diff-only); }
+
+  /* Hover and pin are accent overlays, not difference colours, so they keep
+     working with highlighting turned off. */
+  .row.hover { --overlay: color-mix(in srgb, var(--accent) 9%, transparent); }
+  .row.pinned { --overlay: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+  .empty {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    display: none;
+    margin: 0;
+    padding: 14px 16px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+  .empty.show { display: block; }
+
+  .error {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    display: none;
+    margin: 0;
+    padding: 6px 10px;
+    background: var(--error-bg);
+    color: var(--error);
+    border-top: 1px solid var(--error);
+    font-size: 0.76rem;
+  }
+  .error.show { display: block; }
+
+  .paste-overlay {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: min(62%, 360px);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 12px 26px rgba(16, 24, 40, 0.18);
+    transform: translateY(-100%);
+    visibility: hidden;
+    /* Visibility has to flip at once when opening, or the textarea is still
+       hidden when focus is attempted and the browser refuses it. When closing
+       it is delayed until the slide-out has finished. */
+    transition: transform 0.16s ease, visibility 0s linear 0.16s;
+  }
+  .paste-overlay.open {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.16s ease, visibility 0s linear 0s;
+  }
+  .paste-overlay .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .paste {
+    flex: 1 1 auto;
+    min-height: 0;
+    resize: none;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--panel-alt);
+    color: var(--text);
+    font: 12.5px/1.7 var(--mono);
+    tab-size: 2;
+  }
+  .paste:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Notes band: one row shared by both halves, split by the same rule, with a
+     single drag handle for its height. */
+  .notes {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: var(--notes-height, 150px);
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+  }
+  .notes.collapsed { height: auto; }
+  .notes.collapsed .notes-body { display: none; }
+  .notes-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    height: 22px;
+    padding: 0 6px 0 10px;
+    background: var(--panel-alt);
+    border-bottom: 1px solid var(--border);
+    cursor: ns-resize;
+    user-select: none;
+  }
+  .notes.collapsed .notes-bar { border-bottom: 0; cursor: default; }
+  .notes-label {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .notes-count {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .notes-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+  }
+  .notes-toggle:hover { color: var(--accent); }
+  .notes-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .notes-chevron { display: block; transition: transform 0.12s ease; }
+  .notes.collapsed .notes-chevron { transform: rotate(-90deg); }
+  .notes-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .notes-split { background: var(--border); }
+  .note {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    resize: none;
+    padding: 6px 10px;
+    border: 0;
+    background: var(--panel);
+    color: var(--text);
+    font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .note:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .note::placeholder { color: var(--muted); opacity: 1; }
+  .note:disabled { background: var(--panel-alt); cursor: default; }
+  body.notes-dragging { cursor: ns-resize; user-select: none; }
+
+  .half-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    padding: 5px 10px;
+    background: var(--panel-alt);
+    border-top: 1px solid var(--border);
+    font-size: 0.76rem;
+  }
+  .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .copies { display: flex; gap: 6px; margin-left: auto; }
+  .status { color: var(--accent); font-size: 0.73rem; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <h1>Header Diff</h1>
+    <p>Pick a block per side. Keys line up; gaps are the difference.</p>
+  </div>
+  <div class="top-actions">
+    <button id="add-block" class="btn" type="button">+ Add block</button>
+    <button id="settings-toggle" class="btn ghost" type="button" aria-expanded="false" aria-controls="settings">Settings</button>
+  </div>
+</header>
+
+<section id="settings" class="settings" hidden aria-label="Settings">
+  <h2>Settings</h2>
+  <label class="setting"><input type="checkbox" data-setting="downcase"> Downcase field names</label>
+  <label class="setting"><input type="checkbox" data-setting="wrap"> Wrap long values</label>
+  <label class="setting"><input type="checkbox" data-setting="gutters"> Line numbers</label>
+  <label class="setting"><input type="checkbox" data-setting="highlight"> Highlight differences</label>
+  <label class="setting"><input type="checkbox" data-setting="persist"> Remember blocks in this browser</label>
+  <hr>
+  <p class="note">Turning remembering off stops saving; it does not delete what is already stored.</p>
+  <button id="clear-data" class="btn tiny danger" type="button">Clear stored data</button>
+  <hr>
+  <h2>Blocks file</h2>
+  <div class="data-actions">
+    <button id="export-data" class="btn tiny ghost" type="button">Export JSON</button>
+    <button id="import-data" class="btn tiny ghost" type="button">Import JSON</button>
+    <input id="import-file" type="file" accept="application/json,.json" hidden>
+  </div>
+  <p id="data-status" class="note" aria-live="polite"></p>
+</section>
+
+<section id="shortcuts" class="shortcuts" hidden aria-label="Keyboard shortcuts">
+  <h2>Keyboard shortcuts</h2>
+  <dl>
+    <div><dt>1 &ndash; 9</dt><dd>Show that numbered block on the active half</dd></div>
+    <div><dt>[ &nbsp; ]</dt><dd>Previous / next block on the active half</dd></div>
+    <div><dt>Tab</dt><dd>Switch the active half, from a half's rows</dd></div>
+    <div><dt>S</dt><dd>Swap the two sides</dd></div>
+    <div><dt>N</dt><dd>Add a block and start editing it</dd></div>
+    <div><dt>E</dt><dd>Edit the active half's headers, at the pinned row's line if a row is pinned</dd></div>
+    <div><dt>M</dt><dd>Jump to the active half's notes</dd></div>
+    <div><dt>F2</dt><dd>Rename the selected block</dd></div>
+    <div><dt>Delete</dt><dd>Remove the selected block</dd></div>
+    <div><dt>W</dt><dd>Toggle word wrapping</dd></div>
+    <div><dt>L</dt><dd>Toggle line numbers</dd></div>
+    <div><dt>D</dt><dd>Toggle downcasing</dd></div>
+    <div><dt>H</dt><dd>Toggle difference highlighting</dd></div>
+    <div><dt>,</dt><dd>Open settings</dd></div>
+    <div><dt>?</dt><dd>Show or hide this list</dd></div>
+    <div><dt>Esc</dt><dd>Close the edit area, settings, or this list; on a block with no headers it deletes the block, asking first if the block has a note</dd></div>
+  </dl>
+  <p class="note">The active half is the one you last clicked; an accent line marks its menu bar. Hovering a row lights its counterpart in the other half; clicking pins the pair until you click it again or press Esc. Shortcuts pause while you are typing in a field.</p>
+</section>
+
+<main class="diff">
+  <section class="half" data-side="left" aria-label="Left side">
+    <div class="half-head">
+      <div class="menu" aria-label="Blocks for the left side"></div>
+      <button class="btn tiny ghost paste-toggle" type="button" aria-pressed="false">Edit</button>
+    </div>
+    <div class="pane-wrap">
+      <div class="paste-overlay">
+        <span class="label">Edit headers</span>
+        <textarea class="paste" spellcheck="false" autocomplete="off" placeholder="Host: example.com&#10;Accept: */*&#10;X-Request-Id:abc123"></textarea>
+      </div>
+      <div class="pane" tabindex="0">
+        <p class="empty"></p>
+        <div class="rows"></div>
+      </div>
+      <p class="error" role="alert"></p>
+    </div>
+    <div class="half-foot">
+      <span class="count">0 pairs</span>
+      <div class="copies">
+        <button class="btn tiny ghost copy-original" type="button">Copy original</button>
+        <button class="btn tiny ghost copy-altered" type="button">Copy altered</button>
+        <button class="btn tiny ghost copy-presented" type="button">Copy presented</button>
+      </div>
+      <span class="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <div class="split" aria-hidden="true"></div>
+
+  <section class="half" data-side="right" aria-label="Right side">
+    <div class="half-head">
+      <div class="menu" aria-label="Blocks for the right side"></div>
+      <button class="btn tiny ghost paste-toggle" type="button" aria-pressed="false">Edit</button>
+    </div>
+    <div class="pane-wrap">
+      <div class="paste-overlay">
+        <span class="label">Edit headers</span>
+        <textarea class="paste" spellcheck="false" autocomplete="off" placeholder="Host: example.com&#10;Accept: */*&#10;X-Request-Id:abc123"></textarea>
+      </div>
+      <div class="pane" tabindex="0">
+        <p class="empty"></p>
+        <div class="rows"></div>
+      </div>
+      <p class="error" role="alert"></p>
+    </div>
+    <div class="half-foot">
+      <span class="count">0 pairs</span>
+      <div class="copies">
+        <button class="btn tiny ghost copy-original" type="button">Copy original</button>
+        <button class="btn tiny ghost copy-altered" type="button">Copy altered</button>
+        <button class="btn tiny ghost copy-presented" type="button">Copy presented</button>
+      </div>
+      <span class="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <section class="notes" aria-label="Block notes">
+    <div class="notes-bar">
+      <span class="notes-label">Notes</span>
+      <span class="notes-count" aria-live="polite"></span>
+      <button class="notes-toggle" type="button" aria-expanded="true" aria-controls="notes-body" title="Hide notes"><span class="notes-chevron" aria-hidden="true">&#9662;</span></button>
+    </div>
+    <div class="notes-body" id="notes-body">
+      <textarea class="note" data-side="left" spellcheck="true" placeholder=""></textarea>
+      <div class="notes-split" aria-hidden="true"></div>
+      <textarea class="note" data-side="right" spellcheck="true" placeholder=""></textarea>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const STORAGE_KEY = "header-diff-web/v1";
+  const SIDES = ["left", "right"];
+  const COPY_LABELS = { original: "original", altered: "altered", presented: "presented" };
+  const NAME_MAX = 40;
+  // Files are untrusted input too: caps are checked before anything is trusted,
+  // and a version lets a future format be rejected instead of half-read.
+  const EXPORT_VERSION = 1;
+  const MAX_IMPORT_BYTES = 5_000_000;
+  const MAX_IMPORT_BLOCKS = 500;
+  const MAX_BLOCK_TEXT = 1_000_000;
+  const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+  // Notes are prose, so the cap is counted in characters; the band's height and
+  // collapsed state are per-browser view state, never part of an export.
+  const NOTE_CHAR_LIMIT = 40_000;
+  const NOTES_DEFAULT_HEIGHT = 150;
+  const NOTES_MIN_HEIGHT = 60;
+  const NOTES_MAX_RATIO = 0.45;
+
+  // `plaintext-only` keeps pasted markup out of a contenteditable. Where it is
+  // missing, the paste handler and the commit-time sanitiser still strip it.
+  const PLAINTEXT_OK = (() => {
+    try {
+      const probe = document.createElement("div");
+      probe.contentEditable = "plaintext-only";
+      return probe.contentEditable === "plaintext-only";
+    } catch {
+      return false;
+    }
+  })();
+
+  let activeSide = "left";
+
+  const state = {
+    blocks: [],
+    leftId: null,
+    rightId: null,
+    settings: { downcase: true, wrap: true, gutters: true, highlight: true, persist: true },
+    ui: { notesHeight: NOTES_DEFAULT_HEIGHT, notesCollapsed: false },
+  };
+
+  let diff = { rows: [], sides: [emptySide(), emptySide()] };
+  let diffTimer = null;
+  let requestSeq = 0;
+  let hoverIndex = -1;
+  let pinnedId = null;
+  // Timestamp of the last pin, so the second click of a double-click does not
+  // immediately unpin what the first one pinned.
+  let lastPinAt = 0;
+  // The block this session last created, with what its half showed before. Only
+  // used to put the half back if that block is discarded, which is why nothing
+  // else needs to track creation.
+  let lastCreated = null;
+  // The label currently being renamed, if any.
+  let renaming = null;
+
+  function emptySide(error) {
+    return { error: error || null, count: null, altered: null, presented: null };
+  }
+
+  const halves = SIDES.map((side) => {
+    const root = document.querySelector(`.half[data-side="${side}"]`);
+    return {
+      side,
+      root,
+      menu: root.querySelector(".menu"),
+      pane: root.querySelector(".pane"),
+      rows: root.querySelector(".rows"),
+      empty: root.querySelector(".empty"),
+      error: root.querySelector(".error"),
+      count: root.querySelector(".count"),
+      status: root.querySelector(".status"),
+      pasteToggle: root.querySelector(".paste-toggle"),
+      overlay: root.querySelector(".paste-overlay"),
+      textarea: root.querySelector(".paste"),
+      note: document.querySelector(`.note[data-side="${side}"]`),
+      copyButtons: {
+        original: root.querySelector(".copy-original"),
+        altered: root.querySelector(".copy-altered"),
+        presented: root.querySelector(".copy-presented"),
+      },
+    };
+  });
+
+  const otherHalf = (half) => halves[1 - halves.indexOf(half)];
+  const blockById = (id) => state.blocks.find((block) => block.id === id) || null;
+  // A block's number is its position in the list plus one, so deleting one
+  // renumbers the rest with nothing to store or keep in sync.
+  const numberFor = (block) => state.blocks.indexOf(block) + 1;
+  const selectedBlock = (side) => blockById(state[side + "Id"]);
+  const halfFor = (side) => halves.find((half) => half.side === side);
+  const isTakenElsewhere = (side, id) =>
+    SIDES.some((other) => other !== side && state[other + "Id"] === id);
+
+  function setActiveSide(side) {
+    activeSide = side;
+    for (const half of halves) half.root.classList.toggle("active", half.side === side);
+  }
+
+  /* ---------- state ---------- */
+
+  // Blocks keep insertion order; their number is wherever they sit in the list,
+  // so adding one goes on the end and deleting one closes the gap.
+  function createBlock() {
+    const block = {
+      id: `b${state.blocks.length + 1}-${Math.random().toString(36).slice(2, 7)}`,
+      name: "Block",
+      note: "",
+      text: "",
+    };
+    state.blocks.push(block);
+    return block;
+  }
+
+  function ensureSelections() {
+    const ids = state.blocks.map((block) => block.id);
+    if (!ids.includes(state.leftId)) state.leftId = ids[0] || null;
+    if (!ids.includes(state.rightId) || state.rightId === state.leftId) {
+      state.rightId = ids.find((id) => id !== state.leftId) || null;
+    }
+  }
+
+  function addBlock() {
+    const block = createBlock();
+    let adoptedSide = null;
+    if (!state.leftId) adoptedSide = "left";
+    else if (!state.rightId) adoptedSide = "right";
+    if (adoptedSide) state[adoptedSide + "Id"] = block.id;
+    lastCreated = { id: block.id, side: adoptedSide, previousId: null };
+    persist();
+    renderMenus();
+    syncMenus();
+    renderPaste();
+    if (state.leftId === block.id) {
+      setActiveSide("left");
+      openPaste(halves[0]);
+    } else if (state.rightId === block.id) {
+      setActiveSide("right");
+      openPaste(halves[1]);
+    }
+    scheduleDiff();
+    return block;
+  }
+
+  function addBlockForEditing() {
+    const side = activeSide;
+    const previousId = state[side + "Id"];
+    const block = addBlock();
+    if (state.leftId !== block.id && state.rightId !== block.id) {
+      selectBlock(side, block.id);
+      lastCreated = { id: block.id, side, previousId };
+      openPaste(halfFor(side));
+    }
+  }
+
+  function removeBlock(id) {
+    const index = state.blocks.findIndex((block) => block.id === id);
+    if (index < 0) return;
+    state.blocks.splice(index, 1);
+    ensureSelections();
+    persist();
+    renderMenus();
+    syncMenus();
+    renderPaste();
+    scheduleDiff();
+  }
+
+  function selectBlock(side, id) {
+    if (state[side + "Id"] === id) return;
+    state[side + "Id"] = id;
+    persist();
+    syncMenus();
+    renderPaste();
+    scheduleDiff();
+  }
+
+  function swapSides() {
+    if (!state.leftId || !state.rightId) return;
+    const left = state.leftId;
+    state.leftId = state.rightId;
+    state.rightId = left;
+    persist();
+    syncMenus();
+    renderPaste();
+    scheduleDiff();
+  }
+
+  function cycleBlock(step) {
+    const count = state.blocks.length;
+    if (!count) return;
+    const current = state.blocks.findIndex((block) => block.id === state[activeSide + "Id"]);
+    const start = current < 0 ? (step > 0 ? -1 : 0) : current;
+    for (let offset = 1; offset <= count; offset++) {
+      const index = (((start + step * offset) % count) + count) % count;
+      const block = state.blocks[index];
+      if (block.id === state[activeSide + "Id"]) continue;
+      if (isTakenElsewhere(activeSide, block.id)) continue;
+      selectBlock(activeSide, block.id);
+      return;
+    }
+  }
+
+  function renameActiveBlock() {
+    const block = selectedBlock(activeSide);
+    const half = halfFor(activeSide);
+    if (!block || !half) return;
+    const chip = Array.from(half.menu.querySelectorAll(".chip")).find(
+      (candidate) => candidate.dataset.id === block.id
+    );
+    const label = chip && chip.querySelector(".chip-label");
+    if (label) startRename(block, label);
+  }
+
+  function deleteActiveBlock() {
+    const block = selectedBlock(activeSide);
+    if (!block) return;
+    if (!window.confirm(`Delete "${numberFor(block)}: ${block.name}" and its headers?`)) return;
+    removeBlock(block.id);
+  }
+
+  function editActiveBlock() {
+    const half = halfFor(activeSide);
+    const block = selectedBlock(activeSide);
+    if (!half || !block) return;
+    openPaste(half, sourceLineFor(activeSide, block));
+  }
+
+  // Esc on a block that holds no headers deletes it: an empty block has nothing
+  // to keep, whether it was just added or emptied out. A block with any text
+  // only closes its edit area.
+  function discardEmptyBlock(side) {
+    const block = selectedBlock(side);
+    if (!block || block.text.trim()) return false;
+    // A note is not headers, so it does not keep the block alive, but losing one
+    // silently would be a nasty surprise.
+    if (block.note && block.note.trim()) {
+      const keep = window.confirm(
+        `"${numberFor(block)}: ${block.name}" has no headers but has a note. Delete the block and its note?`
+      );
+      if (!keep) return false;
+    }
+    const half = halfFor(side);
+    // Only a block this session just created knows what its half showed before.
+    const created = lastCreated && lastCreated.id === block.id ? lastCreated : null;
+    lastCreated = null;
+    closePaste(half);
+    removeBlock(block.id);
+
+    // Put that half back the way it was: the block it showed before, or nothing
+    // at all when it was empty until the block was added.
+    if (created && created.side) {
+      const other = SIDES.find((candidate) => candidate !== created.side);
+      const restored = created.previousId ? blockById(created.previousId) : null;
+      state[created.side + "Id"] =
+        restored && state[other + "Id"] !== restored.id ? restored.id : null;
+      persist();
+      syncMenus();
+      renderPaste();
+      scheduleDiff();
+    }
+    flashStatus(half, "Empty block removed");
+    return true;
+  }
+
+  function persist() {
+    if (!state.settings.persist) return;
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          blocks: state.blocks,
+          leftId: state.leftId,
+          rightId: state.rightId,
+          settings: state.settings,
+          ui: state.ui,
+        })
+      );
+    } catch {
+      /* storage may be unavailable; the app still works in memory */
+    }
+  }
+
+  function restore() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    } catch {
+      saved = null;
+    }
+    if (!saved || typeof saved !== "object") return;
+
+    if (saved.settings && typeof saved.settings === "object") {
+      for (const key of Object.keys(state.settings)) {
+        if (typeof saved.settings[key] === "boolean") {
+          state.settings[key] = saved.settings[key];
+        }
+      }
+    }
+
+    if (Array.isArray(saved.blocks)) {
+      for (const raw of saved.blocks) {
+        if (!raw || typeof raw.text !== "string") continue;
+        // A stored number is ignored: numbers are positions now, so the saved
+        // order is the numbering.
+        state.blocks.push({
+          id: typeof raw.id === "string" ? raw.id : `b${state.blocks.length + 1}`,
+          name: normalizeName(raw.name),
+          note: clampNote(typeof raw.note === "string" ? raw.note : ""),
+          text: raw.text,
+        });
+      }
+    }
+
+    if (typeof saved.leftId === "string") state.leftId = saved.leftId;
+    if (typeof saved.rightId === "string") state.rightId = saved.rightId;
+
+    if (saved.ui && typeof saved.ui === "object") {
+      if (Number.isFinite(saved.ui.notesHeight)) state.ui.notesHeight = saved.ui.notesHeight;
+      if (typeof saved.ui.notesCollapsed === "boolean") {
+        state.ui.notesCollapsed = saved.ui.notesCollapsed;
+      }
+    }
+  }
+
+  /* ---------- names ---------- */
+
+  // Everything a name is allowed to contain. A name is shown in the menu bar, in
+  // confirmation text, and in any export of the blocks, so the same cleaning runs
+  // on the rename field, on load, and (once import exists) on file contents:
+  // no line breaks or control characters, no zero-width or bidi-override
+  // characters that could disguise one name as another, one line of text.
+  function cleanNameText(raw) {
+    if (typeof raw !== "string") return "";
+    return raw
+      .normalize("NFC")
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+      .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function normalizeName(raw) {
+    const clipped = Array.from(cleanNameText(raw)).slice(0, NAME_MAX).join("").trim();
+    return clipped || "Block";
+  }
+
+  function selectLabelContents(element) {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function caretToEnd(element) {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function insertPlainText(text) {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  /* ---------- notes ---------- */
+
+  // A note is prose, not headers: never parsed, sorted, downcased or paired, and
+  // it never reaches any of the three copy outputs.
+  // Counted in code points rather than UTF-16 units, so an emoji is one
+  // character of the budget, the same rule the block-name cap uses.
+  function noteLength(text) {
+    return Array.from(String(text || "")).length;
+  }
+
+  function clampNote(text) {
+    const value = typeof text === "string" ? text : "";
+    const chars = Array.from(value);
+    if (chars.length <= NOTE_CHAR_LIMIT) return value;
+    return chars.slice(0, NOTE_CHAR_LIMIT).join("");
+  }
+
+  function notePlaceholder(block) {
+    return `Notes on ${numberFor(block)}: ${block.name} \u2014 context, why it differs, request body\u2026`;
+  }
+
+  // The note belongs to the block, so each half shows the note of the block it
+  // is showing. `value` is only assigned when it differs, which leaves a caret
+  // that is already in the field alone.
+  function renderNotes() {
+    for (const half of halves) {
+      const block = selectedBlock(half.side);
+      half.note.disabled = !block;
+      half.note.placeholder = block ? notePlaceholder(block) : "No block selected for this side.";
+      if (!block) {
+        if (half.note.value) half.note.value = "";
+      } else if (half.note.value !== block.note) {
+        half.note.value = block.note;
+      }
+    }
+    updateNoteCount();
+  }
+
+  function updateNoteCount(focused) {
+    const half = focused || halves.find((candidate) => candidate.note === document.activeElement);
+    if (!half) {
+      notesCount.textContent = "";
+      return;
+    }
+    const length = noteLength(half.note.value);
+    notesCount.textContent = `${length.toLocaleString()} / ${NOTE_CHAR_LIMIT.toLocaleString()} characters`;
+  }
+
+  function applyNotesUi() {
+    const max = Math.max(NOTES_MIN_HEIGHT, Math.round(window.innerHeight * NOTES_MAX_RATIO));
+    const height = Math.min(Math.max(state.ui.notesHeight, NOTES_MIN_HEIGHT), max);
+    notesEl.classList.toggle("collapsed", state.ui.notesCollapsed);
+    notesEl.style.height = state.ui.notesCollapsed ? "" : `${height}px`;
+    notesToggle.setAttribute("aria-expanded", String(!state.ui.notesCollapsed));
+    notesToggle.title = state.ui.notesCollapsed ? "Show notes" : "Hide notes";
+    if (state.ui.notesCollapsed) notesCount.textContent = "";
+  }
+
+  function setNotesHeight(value, remember) {
+    const max = Math.max(NOTES_MIN_HEIGHT, Math.round(window.innerHeight * NOTES_MAX_RATIO));
+    state.ui.notesHeight = Math.min(Math.max(Math.round(value), NOTES_MIN_HEIGHT), max);
+    applyNotesUi();
+    if (remember) persist();
+  }
+
+  function toggleNotes() {
+    state.ui.notesCollapsed = !state.ui.notesCollapsed;
+    applyNotesUi();
+    persist();
+    if (!state.ui.notesCollapsed) {
+      const half = halfFor(activeSide);
+      if (half && selectedBlock(activeSide)) half.note.focus();
+    }
+  }
+
+  function focusActiveNote() {
+    const half = halfFor(activeSide);
+    if (!half || !selectedBlock(activeSide)) return;
+    if (state.ui.notesCollapsed) {
+      state.ui.notesCollapsed = false;
+      applyNotesUi();
+      persist();
+    }
+    half.note.focus();
+  }
+
+  /* ---------- rendering ---------- */
+
+  function renderMenus() {
+    // The menu is rebuilt from scratch, so any rename in progress is moot; this
+    // also stops a stale session from blocking every later rename.
+    renaming = null;
+    for (const half of halves) {
+      half.menu.textContent = "";
+      if (!state.blocks.length) {
+        const note = document.createElement("span");
+        note.className = "menu-empty";
+        note.textContent = "No blocks yet";
+        half.menu.append(note);
+        continue;
+      }
+      for (const block of state.blocks) {
+        if (half.menu.childElementCount) {
+          const separator = document.createElement("span");
+          separator.className = "menu-sep";
+          separator.setAttribute("aria-hidden", "true");
+          separator.textContent = "|";
+          half.menu.append(separator);
+        }
+
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.dataset.id = block.id;
+        chip.tabIndex = 0;
+        chip.setAttribute("role", "button");
+
+        // The number is its own span so renaming can make just the name
+        // editable without the `1: ` prefix disappearing under the caret.
+        const numberEl = document.createElement("span");
+        numberEl.className = "chip-num";
+        numberEl.textContent = `${numberFor(block)}: `;
+
+        const label = document.createElement("span");
+        label.className = "chip-label";
+        label.textContent = block.name;
+        chip.append(numberEl, label);
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "chip-x";
+        remove.textContent = "\u00d7";
+        remove.title = `Remove ${numberFor(block)}: ${block.name}`;
+        remove.addEventListener("click", (event) => {
+          event.stopPropagation();
+          removeBlock(block.id);
+        });
+        chip.append(remove);
+
+        chip.addEventListener("click", () => {
+          const takenElsewhere = SIDES.some(
+            (side) => side !== half.side && state[side + "Id"] === block.id
+          );
+          if (!takenElsewhere) selectBlock(half.side, block.id);
+        });
+        chip.addEventListener("keydown", (event) => {
+          // Keys pressed inside the editable name belong to the rename.
+          if (event.target !== chip) return;
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          const takenElsewhere = SIDES.some(
+            (side) => side !== half.side && state[side + "Id"] === block.id
+          );
+          if (!takenElsewhere) selectBlock(half.side, block.id);
+        });
+        chip.addEventListener("dblclick", (event) => {
+          event.preventDefault();
+          startRename(block, label);
+        });
+
+        half.menu.append(chip);
+      }
+    }
+  }
+
+  function syncMenus() {
+    for (const half of halves) {
+      for (const chip of half.menu.querySelectorAll(".chip")) {
+        const id = chip.dataset.id;
+        const taken = SIDES.some(
+          (side) => side !== half.side && state[side + "Id"] === id
+        );
+        chip.classList.toggle("active", state[half.side + "Id"] === id);
+        chip.classList.toggle("taken", taken);
+        chip.setAttribute("aria-disabled", String(taken));
+        chip.title = taken ? "Compared on the other side" : "Double-click to rename";
+      }
+    }
+  }
+
+  // Rename in place: the chip's own label becomes editable, so the menu bar
+  // never swaps a field in and out of the flow.
+  function startRename(block, label) {
+    if (renaming) return;
+    const session = { done: false, composing: false };
+    renaming = session;
+
+    label.textContent = block.name;
+    label.contentEditable = PLAINTEXT_OK ? "plaintext-only" : "true";
+    label.spellcheck = false;
+    label.classList.add("chip-label-edit");
+    label.setAttribute("role", "textbox");
+    label.setAttribute("aria-label", `Rename ${block.name}`);
+
+    const finish = (commit) => {
+      if (session.done) return;
+      session.done = true;
+      renaming = null;
+      label.removeAttribute("contenteditable");
+      label.removeAttribute("role");
+      label.removeAttribute("aria-label");
+      label.classList.remove("chip-label-edit");
+      if (commit) {
+        // The commit is the guarantee, not the keystroke checks: paste, IME and
+        // drag-and-drop all reach the same sanitiser.
+        const name = normalizeName(label.textContent);
+        if (name !== block.name) {
+          block.name = name;
+          persist();
+        }
+      }
+      renderMenus();
+      syncMenus();
+    };
+
+    // Anything the browser inserted as markup is collapsed to text, and a value
+    // past the cap is trimmed from the end of the caret.
+    const clamp = () => {
+      if (label.childElementCount) label.textContent = label.textContent;
+      const chars = Array.from(label.textContent || "");
+      if (chars.length <= NAME_MAX) return;
+      label.textContent = chars.slice(0, NAME_MAX).join("");
+      caretToEnd(label);
+    };
+
+    label.addEventListener("keydown", (event) => {
+      // Enter while an IME candidate list is open commits that candidate rather
+      // than the rename; keyCode 229 covers browsers that hide isComposing.
+      if (event.isComposing || session.composing || event.keyCode === 229) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(false);
+      }
+    });
+
+    // A label can never hold a line break.
+    label.addEventListener("beforeinput", (event) => {
+      if (event.inputType === "insertParagraph" || event.inputType === "insertLineBreak") {
+        event.preventDefault();
+        return;
+      }
+      if (event.inputType === "insertText" && typeof event.data === "string") {
+        const current = Array.from(label.textContent || "").length;
+        if (current + Array.from(event.data).length > NAME_MAX) event.preventDefault();
+      }
+    });
+
+    label.addEventListener("paste", (event) => {
+      event.preventDefault();
+      const clipboard = event.clipboardData;
+      const room = NAME_MAX - Array.from(label.textContent || "").length;
+      if (room <= 0) return;
+      const raw = clipboard ? clipboard.getData("text/plain") : "";
+      const text = Array.from(cleanNameText(raw)).slice(0, room).join("");
+      if (text) insertPlainText(text);
+      clamp();
+    });
+
+    // Dropping text in would bypass the paste path.
+    label.addEventListener("drop", (event) => event.preventDefault());
+    label.addEventListener("input", () => {
+      if (!session.composing) clamp();
+    });
+    label.addEventListener("compositionstart", () => {
+      session.composing = true;
+    });
+    label.addEventListener("compositionend", () => {
+      session.composing = false;
+      clamp();
+    });
+    label.addEventListener("blur", () => finish(true));
+
+    label.focus();
+    selectLabelContents(label);
+  }
+
+  function renderPaste() {
+    for (const half of halves) {
+      const block = selectedBlock(half.side);
+      half.pasteToggle.disabled = !block;
+      if (!block) {
+        closePaste(half);
+        continue;
+      }
+      if (isPasteOpen(half) && half.textarea.value !== block.text) {
+        half.textarea.value = block.text;
+      }
+    }
+    renderNotes();
+  }
+
+  const isPasteOpen = (half) => half.overlay.classList.contains("open");
+
+  // Offset of the end of one line, so the caret can sit at the end of the header
+  // the pinned row came from.
+  function lineEndOffset(text, index) {
+    let offset = 0;
+    for (let line = 0; line < index; line++) {
+      const next = text.indexOf("\n", offset);
+      if (next < 0) return text.length;
+      offset = next + 1;
+    }
+    const end = text.indexOf("\n", offset);
+    return end < 0 ? text.length : end;
+  }
+
+  // With wrapping on, line heights vary, so this is approximate: the caret is
+  // what has to be visible, and focus scrolls it into view from here.
+  function scrollToLine(textarea, index) {
+    if (index < 0) {
+      textarea.scrollTop = textarea.scrollHeight;
+      return;
+    }
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight);
+    const lines = textarea.value.split("\n").length;
+    const per =
+      Number.isFinite(lineHeight) && lineHeight > 0
+        ? lineHeight
+        : textarea.scrollHeight / Math.max(1, lines);
+    textarea.scrollTop = Math.max(0, (index - 1) * per);
+  }
+
+  // A closed overlay is `visibility: hidden`, and the browser refuses focus on a
+  // hidden element, so one deferred call is not enough: ask now, then keep
+  // asking for a few frames until the textarea really holds focus. Retrying
+  // stops the moment it works. Without a target line the caret goes to the end
+  // of the block, where the next header would be typed.
+  function focusPaste(half, lineIndex) {
+    const textarea = half.textarea;
+    const line = typeof lineIndex === "number" ? lineIndex : -1;
+
+    const placeCaret = () => {
+      const offset = line < 0 ? textarea.value.length : lineEndOffset(textarea.value, line);
+      textarea.setSelectionRange(offset, offset);
+      scrollToLine(textarea, line);
+    };
+
+    let frames = 0;
+    const attempt = () => {
+      if (!isPasteOpen(half)) return;
+      if (document.activeElement !== textarea) textarea.focus({ preventScroll: true });
+      if (document.activeElement === textarea) {
+        placeCaret();
+        return;
+      }
+      if (++frames < 20) requestAnimationFrame(attempt);
+    };
+
+    attempt();
+  }
+
+  function openPaste(half, lineIndex) {
+    const block = selectedBlock(half.side);
+    if (!block) return;
+    if (half.textarea.value !== block.text) half.textarea.value = block.text;
+    half.overlay.classList.add("open");
+    half.pasteToggle.textContent = "Close";
+    half.pasteToggle.setAttribute("aria-pressed", "true");
+    focusPaste(half, lineIndex);
+  }
+
+  function closePaste(half) {
+    half.overlay.classList.remove("open");
+    half.pasteToggle.textContent = "Edit";
+    half.pasteToggle.setAttribute("aria-pressed", "false");
+  }
+
+  function applySettings() {
+    document.body.classList.toggle("wrap", state.settings.wrap);
+    document.body.classList.toggle("gutters", state.settings.gutters);
+    document.body.classList.toggle("highlight", state.settings.highlight);
+    for (const [key, input] of Object.entries(settingInputs)) {
+      input.checked = Boolean(state.settings[key]);
+    }
+  }
+
+  function setSetting(key, value) {
+    state.settings[key] = value;
+    persist();
+    applySettings();
+    if (key === "downcase") scheduleDiff();
+    else if (key === "wrap" || key === "gutters") equalizeHeights();
+  }
+
+  function toggleSetting(key) {
+    setSetting(key, !state.settings[key]);
+  }
+
+  // Which line of this half's own text produced the pinned row. Values are
+  // matched first because repeats are paired by value rather than position, so a
+  // reordered duplicate still finds the copy it came from; the nth occurrence of
+  // the name is the fallback. Returns -1 when there is no pin or this half has
+  // no such header.
+  function sourceLineFor(side, block) {
+    if (pinnedId === null) return -1;
+    const rowIndex = rowIdentities().indexOf(pinnedId);
+    if (rowIndex < 0) return -1;
+    const row = diff.rows[rowIndex];
+    const cell = row && row.cells[SIDES.indexOf(side)];
+    if (typeof cell !== "string") return -1;
+
+    // The server always formats "name: value" and a name cannot contain a
+    // colon, so the first one is always the separator.
+    const split = cell.indexOf(": ");
+    const name = (split < 0 ? cell : cell.slice(0, split)).toLowerCase();
+    const value = split < 0 ? "" : cell.slice(split + 2);
+
+    const lines = String(block.text || "").split(/\r?\n/);
+    const parsed = lines.map((line) => {
+      const colon = line.indexOf(":");
+      if (colon < 0) return null;
+      return {
+        name: line.slice(0, colon).trim().toLowerCase(),
+        value: line.slice(colon + 1).trim(),
+      };
+    });
+
+    for (let index = 0; index < parsed.length; index++) {
+      const item = parsed[index];
+      if (item && item.name === name && item.value === value) return index;
+    }
+
+    let occurrence = 0;
+    for (let index = 0; index < rowIndex; index++) {
+      if (diff.rows[index].key === row.key) occurrence += 1;
+    }
+    let seen = 0;
+    for (let index = 0; index < parsed.length; index++) {
+      const item = parsed[index];
+      if (!item || item.name !== name) continue;
+      if (seen === occurrence) return index;
+      seen += 1;
+    }
+    return -1;
+  }
+
+  // A row's identity is its field name plus which repeat of that name it is.
+  // Rows are rebuilt on every paste, so a pin has to survive by identity and
+  // not by row number.
+  function rowIdentities() {
+    const counts = new Map();
+    return diff.rows.map((row) => {
+      const seen = counts.get(row.key) || 0;
+      counts.set(row.key, seen + 1);
+      return `${row.key}#${seen}`;
+    });
+  }
+
+  // Common prefix and suffix of two values, so only the middle is filled in.
+  function commonEdges(left, right) {
+    const max = Math.min(left.length, right.length);
+    let prefix = 0;
+    while (prefix < max && left[prefix] === right[prefix]) prefix += 1;
+    let suffix = 0;
+    while (
+      suffix < max - prefix &&
+      left[left.length - 1 - suffix] === right[right.length - 1 - suffix]
+    ) {
+      suffix += 1;
+    }
+    return [prefix, left.length - suffix];
+  }
+
+  function buildCell(text, partner, status, caseDiffers) {
+    const cell = document.createElement("span");
+    cell.className = "cell";
+    if (typeof text !== "string") {
+      cell.classList.add("blank");
+      return cell;
+    }
+
+    // The server always formats "name: value" and a field name cannot contain a
+    // colon, so the first one is always the separator.
+    const split = text.indexOf(": ");
+    const name = split < 0 ? text : text.slice(0, split);
+    const value = split < 0 ? "" : text.slice(split + 2);
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "name";
+    nameEl.textContent = name;
+    if (caseDiffers) nameEl.classList.add("name-case");
+    cell.append(nameEl);
+    if (split < 0) return cell;
+    cell.append(document.createTextNode(": "));
+
+    const valueEl = document.createElement("span");
+    valueEl.className = "value";
+    let edges = null;
+    if (status === "changed" && typeof partner === "string") {
+      const otherSplit = partner.indexOf(": ");
+      const other = otherSplit < 0 ? "" : partner.slice(otherSplit + 2);
+      if (other !== value) edges = commonEdges(value, other);
+    }
+    if (edges && edges[1] > edges[0]) {
+      valueEl.append(document.createTextNode(value.slice(0, edges[0])));
+      const mark = document.createElement("span");
+      mark.className = "chg";
+      mark.textContent = value.slice(edges[0], edges[1]);
+      valueEl.append(mark, document.createTextNode(value.slice(edges[1])));
+    } else {
+      valueEl.textContent = value;
+    }
+    cell.append(valueEl);
+    return cell;
+  }
+
+  function renderRows() {
+    const identities = rowIdentities();
+    for (const [index, half] of halves.entries()) {
+      const scrollTop = half.pane.scrollTop;
+      const scrollLeft = half.pane.scrollLeft;
+      half.rows.textContent = "";
+
+      const fragment = document.createDocumentFragment();
+      diff.rows.forEach((row, rowIndex) => {
+        const line = document.createElement("div");
+        line.className = "row";
+        line.dataset.index = String(rowIndex);
+        if (row.status === "changed") line.classList.add("changed");
+        else if (row.status === "only") line.classList.add("only");
+        if (identities[rowIndex] === pinnedId) line.classList.add("pinned");
+        if (rowIndex === hoverIndex) line.classList.add("hover");
+
+        const gutter = document.createElement("span");
+        gutter.className = "gutter";
+        gutter.textContent = String(rowIndex + 1);
+
+        const cell = buildCell(
+          row.cells[index],
+          row.cells[1 - index],
+          row.status,
+          Boolean(row.nameCaseDiffers)
+        );
+
+        line.append(gutter, cell);
+        fragment.append(line);
+      });
+      half.rows.append(fragment);
+      equalizeHeights();
+      half.pane.scrollTop = scrollTop;
+      half.pane.scrollLeft = scrollLeft;
+    }
+  }
+
+  // Repaint hover and pin without rebuilding the rows.
+  function paintRowState() {
+    const identities = rowIdentities();
+    for (const half of halves) {
+      Array.from(half.rows.children).forEach((line, index) => {
+        line.classList.toggle("hover", index === hoverIndex);
+        line.classList.toggle("pinned", identities[index] === pinnedId);
+      });
+    }
+  }
+
+  function setHover(index) {
+    if (index === hoverIndex) return;
+    hoverIndex = index;
+    paintRowState();
+  }
+
+  function clearPin() {
+    if (pinnedId === null) return;
+    pinnedId = null;
+    paintRowState();
+  }
+
+  function togglePin(index) {
+    const identity = rowIdentities()[index];
+    if (!identity) return;
+    pinnedId = pinnedId === identity ? null : identity;
+    paintRowState();
+  }
+
+  // With wrapping on, a long value on one side must grow the matching row on
+  // the other side too, or the two columns drift apart line by line.
+  function equalizeHeights() {
+    const leftRows = Array.from(halves[0].rows.children);
+    const rightRows = Array.from(halves[1].rows.children);
+    for (const row of [...leftRows, ...rightRows]) row.style.minHeight = "";
+    if (!state.settings.wrap) return;
+    const count = Math.min(leftRows.length, rightRows.length);
+    for (let i = 0; i < count; i++) {
+      const height = Math.max(
+        leftRows[i].getBoundingClientRect().height,
+        rightRows[i].getBoundingClientRect().height
+      );
+      leftRows[i].style.minHeight = `${height}px`;
+      rightRows[i].style.minHeight = `${height}px`;
+    }
+  }
+
+  function renderDiff() {
+    for (const [index, half] of halves.entries()) {
+      const side = diff.sides[index] || emptySide();
+      half.error.textContent = side.error || "";
+      half.error.classList.toggle("show", Boolean(side.error));
+      half.count.textContent =
+        typeof side.count === "number"
+          ? `${side.count} ${side.count === 1 ? "pair" : "pairs"}`
+          : "\u2014";
+      half.copyButtons.original.disabled = !selectedBlock(half.side);
+      half.copyButtons.altered.disabled = typeof side.altered !== "string";
+      half.copyButtons.presented.disabled = typeof side.presented !== "string";
+    }
+    renderRows();
+    renderEmptyStates();
+  }
+
+  function renderEmptyStates() {
+    for (const [index, half] of halves.entries()) {
+      let message = "";
+      if (!state.blocks.length) message = "No blocks yet \u2014 add one to start comparing.";
+      else if (!selectedBlock(half.side)) message = "No block selected for this side.";
+      else if (!diff.rows.length && !diff.sides[index].error) {
+        message = "Nothing parsed yet \u2014 open Edit to add headers.";
+      }
+      half.empty.textContent = message;
+      half.empty.classList.toggle(
+        "show",
+        Boolean(message) && !diff.rows.length && !diff.sides[index].error
+      );
+    }
+  }
+
+  /* ---------- data ---------- */
+
+  function scheduleDiff() {
+    clearTimeout(diffTimer);
+    diffTimer = setTimeout(refreshDiff, 120);
+  }
+
+  async function refreshDiff() {
+    const left = selectedBlock("left") ? selectedBlock("left").text : "";
+    const right = selectedBlock("right") ? selectedBlock("right").text : "";
+    const seq = ++requestSeq;
+
+    let payload;
+    try {
+      const response = await fetch("/api/diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ left, right, downcase: state.settings.downcase }),
+      });
+      payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || response.statusText);
+    } catch (error) {
+      if (seq !== requestSeq) return;
+      const message = `Could not reach the local server (${error.message}). Is server.py running?`;
+      diff = { rows: [], sides: [emptySide(message), emptySide(message)] };
+      renderDiff();
+      return;
+    }
+    if (seq !== requestSeq) return;
+    diff = payload;
+    renderDiff();
+  }
+
+  /* ---------- clipboard ---------- */
+
+  function fallbackCopy(text) {
+    const helper = document.createElement("textarea");
+    helper.value = text;
+    helper.setAttribute("readonly", "");
+    helper.style.position = "fixed";
+    helper.style.opacity = "0";
+    document.body.append(helper);
+    helper.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
+    helper.remove();
+    return ok;
+  }
+
+  async function copyText(text) {
+    if (typeof navigator.clipboard?.writeText === "function") {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        return fallbackCopy(text);
+      }
+    }
+    return fallbackCopy(text);
+  }
+
+  function flashStatus(half, message) {
+    half.status.textContent = message;
+    clearTimeout(half.statusTimer);
+    half.statusTimer = setTimeout(() => {
+      half.status.textContent = "";
+    }, 1600);
+  }
+
+  /* ---------- export / import ---------- */
+
+  function setDataStatus(message, isError) {
+    dataStatus.textContent = message;
+    dataStatus.classList.toggle("error-text", Boolean(isError));
+  }
+
+  // The file is plain data, parsed and never evaluated. Everything in it is
+  // untrusted, so every field is type-checked, names go through the same
+  // sanitiser as the rename field, and ids are kept only when well formed and
+  // unique. A bad block is skipped and counted rather than aborting the file.
+  function parseImport(raw) {
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error("That file is not valid JSON.");
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("Expected an object with a blocks array.");
+    }
+    if (data.app !== undefined && data.app !== "header-diff-web") {
+      throw new Error("That file was not exported by this page.");
+    }
+    if (data.version !== undefined && data.version !== EXPORT_VERSION) {
+      throw new Error(`Unsupported file version ${JSON.stringify(data.version)}.`);
+    }
+    if (!Array.isArray(data.blocks)) {
+      throw new Error("That file has no blocks array.");
+    }
+    if (data.blocks.length > MAX_IMPORT_BLOCKS) {
+      throw new Error(`That file has more than ${MAX_IMPORT_BLOCKS} blocks.`);
+    }
+
+    const blocks = [];
+    const usedIds = new Set();
+    let skipped = 0;
+    let cleaned = 0;
+    let trimmed = 0;
+
+    data.blocks.forEach((rawBlock, index) => {
+      if (
+        !rawBlock ||
+        typeof rawBlock !== "object" ||
+        Array.isArray(rawBlock) ||
+        typeof rawBlock.text !== "string" ||
+        rawBlock.text.length > MAX_BLOCK_TEXT
+      ) {
+        skipped += 1;
+        return;
+      }
+
+      const name = normalizeName(rawBlock.name);
+      if (typeof rawBlock.name === "string" && name !== rawBlock.name) cleaned += 1;
+
+      const note = clampNote(typeof rawBlock.note === "string" ? rawBlock.note : "");
+      if (typeof rawBlock.note === "string" && note !== rawBlock.note) trimmed += 1;
+
+      let id =
+        typeof rawBlock.id === "string" && ID_PATTERN.test(rawBlock.id) && !usedIds.has(rawBlock.id)
+          ? rawBlock.id
+          : null;
+      while (id === null || usedIds.has(id)) {
+        id = `b${index + 1}-${Math.random().toString(36).slice(2, 7)}`;
+      }
+      usedIds.add(id);
+
+      blocks.push({ id, name, note, text: rawBlock.text });
+    });
+
+    if (!blocks.length && data.blocks.length) {
+      throw new Error("None of the blocks in that file were usable.");
+    }
+
+    const settings = {};
+    if (data.settings && typeof data.settings === "object" && !Array.isArray(data.settings)) {
+      for (const key of Object.keys(state.settings)) {
+        if (typeof data.settings[key] === "boolean") settings[key] = data.settings[key];
+      }
+    }
+
+    return { blocks, settings, skipped, cleaned, trimmed };
+  }
+
+  // Derived for reading and grepping only: import never reads it, so a
+  // hand-edited copy cannot change what the page stores.
+  function deriveHeaders(text) {
+    const headers = [];
+    for (const line of String(text || "").split(/\r?\n/)) {
+      const colon = line.indexOf(":");
+      if (colon < 0) continue;
+      const name = line.slice(0, colon).trim();
+      if (!name) continue;
+      headers.push({ name, value: line.slice(colon + 1).trim() });
+    }
+    return headers;
+  }
+
+  function exportBlocks() {
+    const data = {
+      app: "header-diff-web",
+      version: EXPORT_VERSION,
+      exported: new Date().toISOString(),
+      settings: { ...state.settings },
+      blocks: state.blocks.map((block) => ({
+        id: block.id,
+        name: block.name,
+        note: block.note,
+        text: block.text,
+        headers: deriveHeaders(block.text),
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `header-diff-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.style.display = "none";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const count = state.blocks.length;
+    setDataStatus(`Exported ${count} ${count === 1 ? "block" : "blocks"}.`);
+  }
+
+  async function importFile(file) {
+    if (file.size > MAX_IMPORT_BYTES) {
+      setDataStatus(`That file is larger than ${MAX_IMPORT_BYTES / 1_000_000} MB.`, true);
+      return;
+    }
+
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      setDataStatus("Could not read that file.", true);
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = parseImport(text);
+    } catch (error) {
+      setDataStatus(error.message, true);
+      return;
+    }
+
+    const before = state.blocks.length;
+    const target = parsed.blocks.length;
+    const label = (count) => `${count} ${count === 1 ? "block" : "blocks"}`;
+    if (!window.confirm(`Replace the current ${label(before)} and the settings with ${label(target)} from this file?`)) {
+      setDataStatus("Import cancelled; nothing changed.");
+      return;
+    }
+
+    state.blocks = parsed.blocks;
+    Object.assign(state.settings, parsed.settings);
+    state.leftId = null;
+    state.rightId = null;
+    lastCreated = null;
+    pinnedId = null;
+    ensureSelections();
+    for (const half of halves) closePaste(half);
+    applySettings();
+    renderMenus();
+    syncMenus();
+    renderPaste();
+    persist();
+    scheduleDiff();
+
+    const details = [];
+    if (parsed.skipped) {
+      details.push(`${label(parsed.skipped)} skipped as unusable`);
+    }
+    if (parsed.cleaned) {
+      details.push(`${parsed.cleaned} ${parsed.cleaned === 1 ? "name" : "names"} cleaned`);
+    }
+    if (parsed.trimmed) {
+      details.push(`${parsed.trimmed} ${parsed.trimmed === 1 ? "note" : "notes"} shortened`);
+    }
+    if (!state.settings.persist) details.push("not saved, remembering is off");
+    setDataStatus(
+      `Imported ${label(target)}${details.length ? ` (${details.join(", ")})` : ""}.`
+    );
+  }
+
+  /* ---------- wiring ---------- */
+
+  const settingInputs = {};
+  document.querySelectorAll("[data-setting]").forEach((input) => {
+    settingInputs[input.dataset.setting] = input;
+  });
+
+  const notesEl = document.querySelector(".notes");
+  const notesCount = document.querySelector(".notes-count");
+  const notesToggle = document.querySelector(".notes-toggle");
+  const notesBar = document.querySelector(".notes-bar");
+  let notePersistTimer = null;
+  let notesDrag = null;
+
+  for (const half of halves) {
+    half.note.addEventListener("input", () => {
+      const block = selectedBlock(half.side);
+      if (!block) return;
+      const value = half.note.value;
+      const clamped = clampNote(value);
+      if (clamped !== value) half.note.value = clamped;
+      block.note = clamped;
+      updateNoteCount(half);
+      // The state is already updated; only the storage write is debounced.
+      clearTimeout(notePersistTimer);
+      notePersistTimer = setTimeout(persist, 400);
+    });
+    half.note.addEventListener("focus", () => {
+      setActiveSide(half.side);
+      updateNoteCount(half);
+    });
+    half.note.addEventListener("blur", () => updateNoteCount());
+  }
+
+  notesBar.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".notes-toggle")) return;
+    if (state.ui.notesCollapsed) return;
+    notesDrag = { y: event.clientY, height: notesEl.getBoundingClientRect().height };
+    notesBar.setPointerCapture(event.pointerId);
+    document.body.classList.add("notes-dragging");
+    event.preventDefault();
+  });
+  notesBar.addEventListener("pointermove", (event) => {
+    if (!notesDrag) return;
+    setNotesHeight(notesDrag.height + (notesDrag.y - event.clientY), false);
+  });
+  const endNotesDrag = (event) => {
+    if (!notesDrag) return;
+    notesDrag = null;
+    document.body.classList.remove("notes-dragging");
+    if (notesBar.hasPointerCapture && notesBar.hasPointerCapture(event.pointerId)) {
+      notesBar.releasePointerCapture(event.pointerId);
+    }
+    persist();
+  };
+  notesBar.addEventListener("pointerup", endNotesDrag);
+  notesBar.addEventListener("pointercancel", endNotesDrag);
+  notesToggle.addEventListener("click", toggleNotes);
+
+  for (const half of halves) {
+    half.pasteToggle.addEventListener("click", () => {
+      if (isPasteOpen(half)) closePaste(half);
+      else openPaste(half);
+    });
+
+    half.textarea.addEventListener("input", () => {
+      const block = selectedBlock(half.side);
+      if (!block) return;
+      block.text = half.textarea.value;
+      if (lastCreated && lastCreated.id === block.id && block.text.trim()) lastCreated = null;
+      persist();
+      scheduleDiff();
+    });
+
+    half.pane.addEventListener("blur", () => half.pane.classList.remove("tab-focus"));
+
+    // Hovering a row lights its counterpart in the other half; clicking pins
+    // the pair so it stays lit while the other half is scrolled. `E` is the way
+    // into the editor, and it uses the pin to pick the line.
+    half.rows.addEventListener("pointerover", (event) => {
+      const line = event.target.closest(".row");
+      setHover(line ? Number(line.dataset.index) : -1);
+    });
+    half.pane.addEventListener("pointerleave", () => setHover(-1));
+    half.rows.addEventListener("click", (event) => {
+      const line = event.target.closest(".row");
+      if (!line) return;
+      // Pin on the first click so the pair lights up at once, and ignore the
+      // second click of a double-click so it cannot unpin what it just pinned.
+      const now = performance.now();
+      if (now - lastPinAt < 280) return;
+      lastPinAt = now;
+      togglePin(Number(line.dataset.index));
+    });
+
+    half.pane.addEventListener("scroll", () => {
+      const other = otherHalf(half);
+      if (Math.abs(other.pane.scrollTop - half.pane.scrollTop) < 1) return;
+      other.pane.scrollTop = half.pane.scrollTop;
+    });
+
+    for (const [kind, button] of Object.entries(half.copyButtons)) {
+      button.addEventListener("click", async () => {
+        const index = halves.indexOf(half);
+        const value =
+          kind === "original"
+            ? (selectedBlock(half.side) || {}).text
+            : diff.sides[index] && diff.sides[index][kind];
+        if (typeof value !== "string") return;
+        const ok = await copyText(value);
+        flashStatus(half, ok ? `Copied ${COPY_LABELS[kind]}` : "Copy failed");
+      });
+    }
+  }
+
+  for (const [key, input] of Object.entries(settingInputs)) {
+    input.addEventListener("change", () => {
+      setSetting(key, input.checked);
+    });
+  }
+
+  const settingsPanel = document.getElementById("settings");
+  const settingsToggle = document.getElementById("settings-toggle");
+  const shortcutPanel = document.getElementById("shortcuts");
+
+  function showSettings(show) {
+    settingsPanel.toggleAttribute("hidden", !show);
+    settingsToggle.setAttribute("aria-expanded", String(show));
+  }
+
+  function toggleSettings() {
+    showSettings(settingsPanel.hasAttribute("hidden"));
+  }
+
+  function showShortcuts(show) {
+    shortcutPanel.toggleAttribute("hidden", !show);
+  }
+
+  settingsToggle.addEventListener("click", toggleSettings);
+
+  // Clicking anywhere outside an open edit area, or its toggle, dismisses it.
+  document.addEventListener("pointerdown", (event) => {
+    const clicked = halves.find((half) => half.root.contains(event.target));
+    if (clicked) setActiveSide(clicked.side);
+    for (const half of halves) half.pane.classList.remove("tab-focus");
+
+    for (const half of halves) {
+      if (!isPasteOpen(half)) continue;
+      if (half.overlay.contains(event.target) || half.pasteToggle.contains(event.target)) continue;
+      closePaste(half);
+    }
+
+    if (!shortcutPanel.hasAttribute("hidden") && !shortcutPanel.contains(event.target)) {
+      showShortcuts(false);
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    const typing =
+      target instanceof HTMLElement &&
+      (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable);
+
+    if (event.key === "Escape") {
+      // A rename field closes itself; do not also dismiss a panel behind it.
+      if (target instanceof HTMLInputElement) return;
+      if (target instanceof HTMLElement && target.isContentEditable) return;
+      // Esc in a note hands focus back to the page instead of closing a panel.
+      if (target instanceof HTMLTextAreaElement && target.classList.contains("note")) {
+        target.blur();
+        return;
+      }
+      if (!shortcutPanel.hasAttribute("hidden")) {
+        showShortcuts(false);
+        return;
+      }
+      const editing = halves.filter(isPasteOpen);
+      if (editing.length) {
+        // An empty block is deleted rather than kept; anything with content just
+        // closes its edit area.
+        for (const half of editing) {
+          if (!discardEmptyBlock(half.side)) closePaste(half);
+        }
+        return;
+      }
+      if (!settingsPanel.hasAttribute("hidden")) {
+        showSettings(false);
+        return;
+      }
+      clearPin();
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    if (!shortcutPanel.hasAttribute("hidden")) return;
+    if (typing) return;
+
+    if (event.key === "?") {
+      event.preventDefault();
+      showShortcuts(true);
+      return;
+    }
+    if (event.repeat && "wldsnhem".includes(event.key.toLowerCase())) return;
+
+    if (event.key === "Tab") {
+      // Only while a half's rows hold focus, so normal focus movement survives.
+      const focused = halves.find((half) => half.pane === document.activeElement);
+      if (!focused) return;
+      event.preventDefault();
+      const next = otherHalf(focused);
+      setActiveSide(next.side);
+      next.pane.classList.add("tab-focus");
+      next.pane.focus();
+      return;
+    }
+
+    if (event.key === "Delete") {
+      event.preventDefault();
+      deleteActiveBlock();
+      return;
+    }
+
+    if (event.key === "F2") {
+      event.preventDefault();
+      renameActiveBlock();
+      return;
+    }
+
+    if (event.key.length === 1 && "123456789".includes(event.key)) {
+      const block = state.blocks[Number(event.key) - 1];
+      if (!block || isTakenElsewhere(activeSide, block.id)) return;
+      event.preventDefault();
+      selectBlock(activeSide, block.id);
+      return;
+    }
+
+    if (event.key === "[" || event.key === "]") {
+      event.preventDefault();
+      cycleBlock(event.key === "]" ? 1 : -1);
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    if (key === "s") {
+      event.preventDefault();
+      swapSides();
+      return;
+    }
+    if (key === "n") {
+      event.preventDefault();
+      addBlockForEditing();
+      return;
+    }
+    if (key === "e") {
+      event.preventDefault();
+      editActiveBlock();
+      return;
+    }
+    if (key === "m") {
+      event.preventDefault();
+      focusActiveNote();
+      return;
+    }
+    if (key === "w" || key === "l" || key === "d" || key === "h") {
+      event.preventDefault();
+      toggleSetting({ w: "wrap", l: "gutters", d: "downcase", h: "highlight" }[key]);
+      return;
+    }
+    if (event.key === ",") {
+      event.preventDefault();
+      toggleSettings();
+    }
+  });
+
+  document.getElementById("add-block").addEventListener("click", addBlock);
+
+  document.getElementById("clear-data").addEventListener("click", () => {
+    if (!window.confirm("Delete every block and its headers from this browser?")) return;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* nothing stored */
+    }
+    state.blocks = [];
+    state.leftId = null;
+    state.rightId = null;
+    for (const half of halves) closePaste(half);
+    renderMenus();
+    syncMenus();
+    renderPaste();
+    scheduleDiff();
+  });
+
+  const dataStatus = document.getElementById("data-status");
+  const importInput = document.getElementById("import-file");
+
+  document.getElementById("export-data").addEventListener("click", exportBlocks);
+  document.getElementById("import-data").addEventListener("click", () => {
+    // Reset first so choosing the same file twice still fires `change`.
+    importInput.value = "";
+    importInput.click();
+  });
+  importInput.addEventListener("change", () => {
+    const file = importInput.files && importInput.files[0];
+    if (file) importFile(file);
+    importInput.value = "";
+  });
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      equalizeHeights();
+      applyNotesUi();
+    }, 80);
+  });
+
+  /* ---------- boot ---------- */
+
+  restore();
+  if (!state.blocks.length) {
+    const first = createBlock();
+    const second = createBlock();
+    state.leftId = first.id;
+    state.rightId = second.id;
+  }
+  ensureSelections();
+  applySettings();
+  applyNotesUi();
+  setActiveSide(activeSide);
+  renderMenus();
+  syncMenus();
+  renderPaste();
+  persist();
+  scheduleDiff();
+})();
+</script>
+</body>
+</html>
