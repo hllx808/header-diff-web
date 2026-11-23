@@ -1,0 +1,5 @@
+# header-sorter travels with this repository as a source tarball, so the app
+# installs with no package index and no sibling checkout.
+# pip resolves this path from the working directory, so run pip here (the
+# documented setup command and Render's build command both do).
+./vendor/header_sorter-0.2.0.tar.gz

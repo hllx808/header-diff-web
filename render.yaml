@@ -1,0 +1,10 @@
+# Render blueprint for header-diff.
+# Render: New -> Blueprint, point it at this repository.
+services:
+  - type: web
+    name: header-diff
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    healthCheckPath: /

@@ -1,28 +1,27 @@
-"""Local web server for the header diff UI.
+"""Web server for the header diff UI.
 
-Run from anywhere:
+Install the dependency, then run it from this directory:
 
-    python3 header-diff-web/server.py
+    python3 -m pip install -r requirements.txt
+    python3 server.py
 
-Then open http://127.0.0.1:8001/ in a browser.
+binds to 0.0.0.0:8000 by default
+Open http://127.0.0.1:8000/ locally; pass --host/--port to change either.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import sys
+import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from header_sorter import InvalidHeaderError, parse_headers
+
 BASE_DIR = Path(__file__).resolve().parent
-PACKAGE_SRC = BASE_DIR.parent / "python-packages" / "header-sorter" / "src"
-sys.path.insert(0, str(PACKAGE_SRC))
-
-from header_sorter import InvalidHeaderError, parse_headers  # noqa: E402
-
 INDEX = BASE_DIR / "static" / "index.html"
 MAX_BODY = 2_000_000
 
@@ -239,16 +238,29 @@ class HeaderDiffHandler(BaseHTTPRequestHandler):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Serve the local header diff UI.")
+    parser = argparse.ArgumentParser(description="Serve the header diff UI.")
     parser.add_argument(
-        "--host", default="127.0.0.1", help="bind address (default: 127.0.0.1)"
+        "--host",
+        default=os.environ.get("HOST", "0.0.0.0"),
+        help="bind address (default: 0.0.0.0; HOST is used when set)",
     )
-    parser.add_argument("--port", type=int, default=8001, help="port (default: 8001)")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PORT", "8000")),
+        help="port (default: 8000; PORT is used when set)",
+    )
     args = parser.parse_args(argv)
 
     server = ThreadingHTTPServer((args.host, args.port), HeaderDiffHandler)
     host, port = server.server_address[:2]
-    print(f"Header diff UI on http://{host}:{port}/  (Ctrl-C to stop)")
+    # 0.0.0.0 is not a browsable address; point the reader at loopback.
+    shown = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    print(
+        f"Header diff UI on http://{shown}:{port}/  "
+        f"(bound to {host}; Ctrl-C to stop)",
+        flush=True,
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

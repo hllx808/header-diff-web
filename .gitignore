@@ -1,0 +1,21 @@
+# Python build and cache output.
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Local virtual environments.
+.venv/
+venv/
+
+# Workspace-local helper that rebuilds the vendored sdist from the sibling
+# header-sorter checkout; it cannot run in a clone of this repository.
+refresh_vendor.sh
+
+# Private developer notes for this checkout, including the Render service
+# settings. The published repository gets README.md only.
+DEVELOPERS.md
+
+# machine-local
+.DS_Store
